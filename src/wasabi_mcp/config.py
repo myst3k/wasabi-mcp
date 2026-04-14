@@ -49,10 +49,13 @@ class WasabiConfig:
     region_map: dict[str, str] = field(default_factory=lambda: dict(FALLBACK_REGION_MAP))
 
     @classmethod
-    def from_env(cls) -> WasabiConfig:
+    def from_env(cls, *, profile: str | None = None) -> WasabiConfig:
         access_key = os.environ.get("WASABI_ACCESS_KEY_ID")
         secret_key = os.environ.get("WASABI_SECRET_ACCESS_KEY")
-        profile = os.environ.get("AWS_PROFILE") if not access_key else None
+        if profile:
+            # Explicit --profile overrides env-var credentials
+            access_key = secret_key = None
+        resolved_profile = profile or (os.environ.get("AWS_PROFILE") if not access_key else None)
         region = os.environ.get("WASABI_REGION", "us-east-1")
         iam_endpoint = os.environ.get("WASABI_IAM_ENDPOINT", WASABI_IAM_ENDPOINT)
         db_path_str = os.environ.get("WASABI_INDEX_DB_PATH")
@@ -61,7 +64,7 @@ class WasabiConfig:
         return cls(
             access_key_id=access_key,
             secret_access_key=secret_key,
-            aws_profile=profile,
+            aws_profile=resolved_profile,
             region=region,
             iam_endpoint=iam_endpoint,
             index_db_path=db_path,

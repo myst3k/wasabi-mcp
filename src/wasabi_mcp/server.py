@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -24,9 +25,12 @@ class AppContext:
     config: WasabiConfig
 
 
+_cli_profile: str | None = None
+
+
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
-    config = WasabiConfig.from_env()
+    config = WasabiConfig.from_env(profile=_cli_profile)
     clients = ClientManager(config)
 
     config.index_db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -56,4 +60,9 @@ import wasabi_mcp.tools  # noqa: E402, F401
 
 
 def main() -> None:
+    global _cli_profile
+    parser = argparse.ArgumentParser(description="Wasabi MCP Server")
+    parser.add_argument("--profile", help="AWS/Wasabi config profile name to use for credentials")
+    args = parser.parse_args()
+    _cli_profile = args.profile
     mcp.run(transport="stdio")

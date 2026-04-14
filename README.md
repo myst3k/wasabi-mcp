@@ -20,6 +20,12 @@ MCP server for [Wasabi](https://wasabi.com) cloud storage. Browse buckets, inspe
 claude mcp add wasabi-mcp -- uvx --from git+https://github.com/myst3k/wasabi-mcp wasabi-mcp
 ```
 
+To use a named profile from `~/.aws/credentials`:
+
+```bash
+claude mcp add wasabi-mcp -- uvx --from git+https://github.com/myst3k/wasabi-mcp wasabi-mcp --profile my-wasabi
+```
+
 ### Claude Desktop
 
 Add to your `claude_desktop_config.json`:
@@ -47,6 +53,19 @@ If you already have Wasabi credentials in `~/.aws/credentials` (default profile)
     "wasabi": {
       "command": "uvx",
       "args": ["--from", "git+https://github.com/myst3k/wasabi-mcp", "wasabi-mcp"]
+    }
+  }
+}
+```
+
+To use a named profile:
+
+```json
+{
+  "mcpServers": {
+    "wasabi": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/myst3k/wasabi-mcp", "wasabi-mcp", "--profile", "my-wasabi"]
     }
   }
 }
@@ -105,7 +124,15 @@ For local dev with Claude Desktop:
 
 All settings are optional. The server works out of the box if you have Wasabi credentials in `~/.aws/credentials`.
 
-| Environment Variable | Default | Description |
+### CLI flags
+
+| Flag | Description |
+|------|-------------|
+| `--profile NAME` | AWS/Wasabi credentials profile to use (overrides env vars) |
+
+### Environment variables
+
+| Variable | Default | Description |
 |---------------------|---------|-------------|
 | `WASABI_ACCESS_KEY_ID` | — | Wasabi access key (checked first) |
 | `WASABI_SECRET_ACCESS_KEY` | — | Wasabi secret key (checked first) |
@@ -113,6 +140,13 @@ All settings are optional. The server works out of the box if you have Wasabi cr
 | `WASABI_REGION` | `us-east-1` | Default region for initial API connection |
 | `WASABI_IAM_ENDPOINT` | `https://iam.wasabisys.com` | IAM endpoint override |
 | `WASABI_INDEX_DB_PATH` | platform-specific | SQLite index database path |
+
+### Credential priority
+
+1. `--profile` flag (highest — ignores env var keys when set)
+2. `WASABI_ACCESS_KEY_ID` + `WASABI_SECRET_ACCESS_KEY`
+3. `AWS_PROFILE`
+4. Default boto3 credential chain (`~/.aws/credentials`)
 
 **Default index database location:**
 
