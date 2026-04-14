@@ -1,6 +1,6 @@
 [project]
 name = "wasabi-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for Wasabi S3 and IAM operations with local search index"
 readme = "README.md"
 authors = [

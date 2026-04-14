@@ -1,1 +1,1 @@
-from wasabi_mcp.tools import buckets, objects, iam, index  # noqa: F401
+from wasabi_mcp.tools import buckets, objects, iam, index, server  # noqa: F401

@@ -10,6 +10,7 @@ from typing import Any
 import aiosqlite
 from mcp.server.fastmcp import FastMCP
 
+from wasabi_mcp import __version__
 from wasabi_mcp.clients import ClientManager
 from wasabi_mcp.config import WasabiConfig
 from wasabi_mcp.index.db import init_database
@@ -38,7 +39,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
     await clients.fetch_region_map()
 
-    logger.info("Wasabi MCP server started")
+    logger.info(f"Wasabi MCP server v{__version__} started")
     logger.info(f"Default region: {config.region}")
     logger.info(f"Index DB: {config.index_db_path}")
 
