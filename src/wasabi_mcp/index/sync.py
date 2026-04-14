@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import queue
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -9,6 +10,13 @@ from typing import Any
 import aiosqlite
 
 logger = logging.getLogger(__name__)
+
+# Number of S3 list pages to buffer ahead of the async consumer.  Each page
+# is up to 1 000 objects.  A small buffer lets the S3 listing run ahead
+# while the event loop processes + writes the previous batch.
+_BUFFER_SIZE = 5
+
+_SENTINEL = object()
 
 
 async def sync_bucket(
@@ -38,17 +46,36 @@ async def sync_bucket(
     upserted = 0
     newest_modified: str | None = last_cursor
 
-    def _paginate() -> list[list[dict[str, Any]]]:
-        all_pages = []
-        for page in paginator.paginate(**pages_kwargs):
-            contents = page.get("Contents", [])
-            if contents:
-                all_pages.append(contents)
-        return all_pages
+    # Bounded queue: the S3 listing thread pushes pages, the async loop
+    # consumes them.  Backpressure keeps memory usage bounded.
+    page_queue: queue.Queue[Any] = queue.Queue(maxsize=_BUFFER_SIZE)
 
-    all_pages = await asyncio.to_thread(_paginate)
+    def _list_all_pages() -> None:
+        """Run the full S3 paginated listing, pushing pages into the queue."""
+        try:
+            for page in paginator.paginate(**pages_kwargs):
+                contents = page.get("Contents", [])
+                if contents:
+                    page_queue.put(contents)
+        finally:
+            page_queue.put(_SENTINEL)
 
-    for contents in all_pages:
+    # Start the listing in a background thread.
+    list_task = asyncio.get_event_loop().run_in_executor(None, _list_all_pages)
+
+    # Consume pages from the queue on the async side.
+    while True:
+        item = None
+        while item is None:
+            try:
+                item = page_queue.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.05)
+
+        if item is _SENTINEL:
+            break
+
+        contents: list[dict[str, Any]] = item
         rows = []
         for obj in contents:
             key = obj["Key"]
@@ -84,9 +111,14 @@ async def sync_bucket(
             )
             upserted += len(rows)
 
+        if len(seen_keys) % 10000 < 1000:
+            logger.info(f"index {bucket}: {len(seen_keys)} objects scanned so far")
+
+    # Ensure the listing thread is finished.
+    await list_task
+
     deleted = 0
     if force_full and seen_keys:
-        # Remove objects that no longer exist in S3
         existing = await db.execute_fetchall(
             "SELECT key FROM objects WHERE bucket = ? AND (? = '' OR key LIKE ? || '%')",
             (bucket, prefix, prefix),
